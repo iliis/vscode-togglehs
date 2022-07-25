@@ -1,6 +1,8 @@
 'use strict';
 import * as vscode from 'vscode';
 import * as path from 'path';
+import { strict } from 'assert';
+import { basename } from 'path';
 var fileExists = require('file-exists');
 
 const headerExts = [ '.h', '.hpp', '.hh', '.hxx' ];
@@ -17,34 +19,77 @@ function testExtension(fileName:string, exts:string[]) {
   return undefined != found;
 }
 
+// How many folders does a have in common with b
+// example: /foo/bar/baz, /foo/bar/asdf -> 2
+function commonPathParts(a:string, b:string) {
+  var a_path = path.dirname(a).split(path.sep);
+  var b_path = path.dirname(b).split(path.sep);
+  
+  for (var i = 0; i < Math.min(a_path.length, b_path.length); ++i) {
+    if (a_path[i] != b_path[i]) {
+      return i;
+    }
+  }
+  return i;
+}
+
 // Finds a file matching an extension included in the given array.
-function findFile(baseName:string, exts:string[]) {
-  return allExts(exts).map((ext) => { return baseName + ext; })
-    .find((fileName) => { return fileExists(fileName); });
+async function findFile(baseName:string, exts:string[]) {
+  
+  var name = path.parse(baseName).name;
+  
+  var pattern = '**/'+name+'{' + exts.join(',') + '}';
+  //console.log('searching: '+pattern)
+
+  try {
+    var matching_files = await vscode.workspace.findFiles(pattern);
+    //vscode.window.showInformationMessage("Found " + values.length + " matches.");
+    
+    console.log("found "+matching_files.length+" matches");
+    
+    if (matching_files.length == 0)
+      return false;
+  
+    // sort by number of common folders
+    matching_files.sort((a, b) => {
+      return commonPathParts(baseName, a.fsPath) - commonPathParts(baseName, b.fsPath);
+    });
+    
+    console.log("best match: " + matching_files[0].fsPath);
+    
+    return matching_files[0].fsPath;
+  } catch (e) {
+    return false; // no files found
+  }
 }
 
 // Try to toggle current vscode file from a given set of extensions to another.
-function tryToggle(file:vscode.Uri, from:string[], to:string[]) {
+async function tryToggle(file:vscode.Uri, from:string[], to:string[]) {
   return new Promise<boolean>((accept, reject) => {
     if (file.scheme !== 'file') {
       reject('Unsupported file scheme.');
+      return;
     }
+
     var fileStr = file.fsPath;
     if (!testExtension(fileStr, from)) {
-      accept(false);
+      accept(false); // not a supported file
+      return;
     }
+
     var baseName = fileStr.substr(0, fileStr.lastIndexOf('.'));
-    var found = findFile(baseName, to);
-    if (found) {
-      vscode.workspace.openTextDocument(found).then(
-        (doc) => {
-          var column = vscode.window.activeTextEditor.viewColumn;
-          vscode.window.showTextDocument(doc, column).then(() => { accept(true); }, reject);
-        }, reject
-      );
-    } else {
-      reject('Cannot find corresponding file.');
-    }
+    findFile(baseName, to).then((found) => {
+      if (found) {
+        vscode.workspace.openTextDocument(found).then(
+          (doc) => {
+            var column = vscode.window.activeTextEditor.viewColumn;
+            vscode.window.showTextDocument(doc, column).then(() => { accept(true); }, reject);
+          }, reject
+        );
+      } else {
+        reject('Cannot find corresponding header/source file.');
+      }
+    });
   });
 }
 
@@ -57,7 +102,7 @@ export function activate(context: vscode.ExtensionContext) {
       if (!ok) {
         tryToggle(currentFile, sourceExts, headerExts).then((ok) => {
           if (!ok) {
-            vscode.window.showErrorMessage('Cannot find corresponding file.');
+            vscode.window.showErrorMessage('Cannot toggle to corresponding header/source, this filetype is not supported.');
           }
         }).catch((reason) => {
           vscode.window.showErrorMessage(reason);

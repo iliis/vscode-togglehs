@@ -2,17 +2,19 @@
   "name": "togglehs",
   "displayName": "Toggle Header/Source",
   "description": "Quickly switch between header/source files for C and C++ files",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "publisher": "bbenoist",
   "license": "MIT",
-  "bugs": { "url": "https://github.com/bbenoist/vscode-togglehs/issues" },
+  "bugs": {
+    "url": "https://github.com/bbenoist/vscode-togglehs/issues"
+  },
   "homepage": "https://github.com/bbenoist/vscode-togglehs/blob/master/README.md",
   "repository": {
     "type": "git",
     "url": "https://github.com/bbenoist/vscode-togglehs.git"
   },
   "engines": {
-    "vscode": "^1.0.0"
+    "vscode": "^1.69.0"
   },
   "categories": [
     "Other"
@@ -20,7 +22,7 @@
   "activationEvents": [
     "onCommand:togglehs.toggleHS"
   ],
-  "main": "./out/src/extension",
+  "main": "./out/src/extension.js",
   "contributes": {
     "commands": [
       {
@@ -36,13 +38,25 @@
     ]
   },
   "scripts": {
-    "vscode:prepublish": "node ./node_modules/vscode/bin/compile",
-    "compile": "node ./node_modules/vscode/bin/compile -watch -p ./",
-    "postinstall": "node ./node_modules/vscode/bin/install"
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
   },
   "devDependencies": {
-    "typescript": "^1.7.5",
-    "vscode": "^0.11.0"
+    "@types/glob": "^7.2.0",
+    "@types/mocha": "^9.1.1",
+    "@types/node": "^16.11.45",
+    "@types/vscode": "^1.69.0",
+    "@typescript-eslint/eslint-plugin": "^5.30.0",
+    "@typescript-eslint/parser": "^5.30.0",
+    "@vscode/test-electron": "^2.1.5",
+    "eslint": "^8.18.0",
+    "glob": "^8.0.3",
+    "mocha": "^10.0.0",
+    "typescript": "^4.7.4"
   },
   "dependencies": {
     "file-exists": "^1.0.0"
