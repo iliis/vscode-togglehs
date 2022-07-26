@@ -5,6 +5,7 @@ import { strict } from 'assert';
 import { basename } from 'path';
 var fileExists = require('file-exists');
 
+// TODO: Add support for implementation headers (.inl) and toggle between the three (.hpp -> .inl -> .cpp -> .hpp)
 const headerExts = [ '.h', '.hpp', '.hh', '.hxx' ];
 const sourceExts = [ '.c', '.cpp', '.cc', '.cxx', '.m', '.mm' ];
 
@@ -21,6 +22,13 @@ function testExtension(fileName:string, exts:string[]) {
 
 // How many folders does a have in common with b
 // example: /foo/bar/baz, /foo/bar/asdf -> 2
+// TODO: This currently only considers the beginning, i.e. up to the first
+// folder that's different. A better matching algorithm would also consider the
+// rest. For example:
+//   /a/b/src/foo/bar.cpp
+//   /a/b/include/foo/bar.hpp <- you probably want that, but only has /a/b in common
+//   /a/b/src/bar.hpp <- but this has /a/b/src in common and currently scores better
+// Or maybe make this a user configurable flag?
 function commonPathParts(a:string, b:string) {
   var a_path = path.dirname(a).split(path.sep);
   var b_path = path.dirname(b).split(path.sep);
@@ -34,6 +42,9 @@ function commonPathParts(a:string, b:string) {
 }
 
 // Finds a file matching an extension included in the given array.
+// TODO: Fall back to old method of just replacing extension and checking if
+// file exists if findFiles doesn't find anything (so that this works even
+// outside a workspace)
 async function findFile(baseName:string, exts:string[]) {
   
   var name = path.parse(baseName).name;
