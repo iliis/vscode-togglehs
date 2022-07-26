@@ -59,6 +59,7 @@
     "typescript": "^4.7.4"
   },
   "dependencies": {
-    "file-exists": "^1.0.0"
+    "file-exists": "^1.0.0",
+    "vsce": "^2.10.0"
   }
 }

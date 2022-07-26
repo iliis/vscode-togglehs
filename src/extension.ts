@@ -45,17 +45,28 @@ async function findFile(baseName:string, exts:string[]) {
     var matching_files = await vscode.workspace.findFiles(pattern);
     //vscode.window.showInformationMessage("Found " + values.length + " matches.");
     
-    console.log("found "+matching_files.length+" matches");
     
     if (matching_files.length == 0)
+    {
+      // I think this cannot happen, instead findFiles will throw an exception
+      console.log("No matches found.");
       return false;
+    }
   
     // sort by number of common folders
+    // closest match (largest number of common path elements) should be first entry
     matching_files.sort((a, b) => {
-      return commonPathParts(baseName, a.fsPath) - commonPathParts(baseName, b.fsPath);
+      return commonPathParts(baseName, b.fsPath) - commonPathParts(baseName, a.fsPath);
     });
     
-    console.log("best match: " + matching_files[0].fsPath);
+    if (matching_files.length > 1) {
+      console.log("found "+matching_files.length+" matches:");
+      matching_files.map((val, i, _) => {
+        console.log(" [" + i + "]: match=" + commonPathParts(baseName, val.fsPath) + " " + val.fsPath);
+      });
+    } else {
+      console.log("only found one match: " + matching_files[0].fsPath);
+    }
     
     return matching_files[0].fsPath;
   } catch (e) {
