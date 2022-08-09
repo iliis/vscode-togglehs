@@ -7,7 +7,7 @@ var fileExists = require('file-exists');
 
 // TODO: Add support for implementation headers (.inl) and toggle between the three (.hpp -> .inl -> .cpp -> .hpp)
 const headerExts = [ '.h', '.hpp', '.hh', '.hxx' ];
-const sourceExts = [ '.c', '.cpp', '.cc', '.cxx', '.m', '.mm' ];
+const sourceExts = [ '.c', '.cpp', '.cc', '.cxx', '.m', '.mm', '.inl' ];
 
 // Generates appropriate variants for the predefined extensions arrays.
 function allExts(exts:string[]) {
