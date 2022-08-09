@@ -5,9 +5,9 @@ import { strict } from 'assert';
 import { basename } from 'path';
 var fileExists = require('file-exists');
 
-// TODO: Add support for implementation headers (.inl) and toggle between the three (.hpp -> .inl -> .cpp -> .hpp)
-const headerExts = [ '.h', '.hpp', '.hh', '.hxx' ];
-const sourceExts = [ '.c', '.cpp', '.cc', '.cxx', '.m', '.mm' ];
+
+// toggle from one to the next extension, so for example .hpp -> .inl -> .cpp -> .hpp
+const extensions = [ '.h', '.hpp', '.hh', '.hxx', '.inl', '.c', '.cpp', '.cc', '.cxx', '.m', '.mm' ];
 
 // Generates appropriate variants for the predefined extensions arrays.
 function allExts(exts:string[]) {
@@ -45,17 +45,27 @@ function commonPathParts(a:string, b:string) {
 // TODO: Fall back to old method of just replacing extension and checking if
 // file exists if findFiles doesn't find anything (so that this works even
 // outside a workspace)
-async function findFile(baseName:string, exts:string[]) {
+async function findNextFile(baseName:string) {
+  console.log('looking for next file for '+baseName);
   
   var name = path.parse(baseName).name;
+  var ext  = path.parse(baseName).ext;
   
-  var pattern = '**/'+name+'{' + exts.join(',') + '}';
+  var pattern = '**/'+name+'{' + extensions.join(',') + '}';
   //console.log('searching: '+pattern)
 
   try {
     var matching_files = await vscode.workspace.findFiles(pattern);
     //vscode.window.showInformationMessage("Found " + values.length + " matches.");
     
+    // reorder extensions so that extension of current file is last
+    // e.g. [a,b,c,d,e] -> foo.b -> [c,d,e,a,b]
+    var idx = extensions.indexOf(ext);
+    if (idx < 0) {
+      console.error("Could not find file extension '" + ext + "' in list of supported extensions: " + extensions.join(',') + ". This should not happen!");
+      return false;
+    }
+    var extensions_priorities = extensions.slice(idx+1).concat(extensions.slice(0, idx+1));
     
     if (matching_files.length == 0)
     {
@@ -66,8 +76,17 @@ async function findFile(baseName:string, exts:string[]) {
   
     // sort by number of common folders
     // closest match (largest number of common path elements) should be first entry
+    // for identical path lengths decide based on extension list order
+    // return >0 if 'a' is better than 'b' and should be sorted first
     matching_files.sort((a, b) => {
-      return commonPathParts(baseName, b.fsPath) - commonPathParts(baseName, a.fsPath);
+      var common_a = commonPathParts(baseName, a.fsPath);
+      var common_b = commonPathParts(baseName, b.fsPath);
+      if (common_a == common_b) {
+        return extensions_priorities.indexOf(path.parse(a.fsPath).ext)
+             - extensions_priorities.indexOf(path.parse(b.fsPath).ext);
+      } else {
+        return common_b - common_a;
+      }
     });
     
     if (matching_files.length > 1) {
@@ -86,7 +105,7 @@ async function findFile(baseName:string, exts:string[]) {
 }
 
 // Try to toggle current vscode file from a given set of extensions to another.
-async function tryToggle(file:vscode.Uri, from:string[], to:string[]) {
+async function tryToggle(file:vscode.Uri) {
   return new Promise<boolean>((accept, reject) => {
     if (file.scheme !== 'file') {
       reject('Unsupported file scheme.');
@@ -94,13 +113,12 @@ async function tryToggle(file:vscode.Uri, from:string[], to:string[]) {
     }
 
     var fileStr = file.fsPath;
-    if (!testExtension(fileStr, from)) {
+    if (!testExtension(fileStr, extensions)) {
       accept(false); // not a supported file
       return;
     }
 
-    var baseName = fileStr.substr(0, fileStr.lastIndexOf('.'));
-    findFile(baseName, to).then((found) => {
+    findNextFile(fileStr).then((found) => {
       if (found) {
         vscode.workspace.openTextDocument(found).then(
           (doc) => {
@@ -120,19 +138,15 @@ async function tryToggle(file:vscode.Uri, from:string[], to:string[]) {
 export function activate(context: vscode.ExtensionContext) {
   let disposable = vscode.commands.registerTextEditorCommand('togglehs.toggleHS', (textEditor, edit) => {
     var currentFile = vscode.window.activeTextEditor.document.uri;
-    tryToggle(currentFile, headerExts, sourceExts).then((ok) => {
+
+    tryToggle(currentFile).then((ok) => {
       if (!ok) {
-        tryToggle(currentFile, sourceExts, headerExts).then((ok) => {
-          if (!ok) {
-            vscode.window.showErrorMessage('Cannot toggle to corresponding header/source, this filetype is not supported.');
-          }
-        }).catch((reason) => {
-          vscode.window.showErrorMessage(reason);
-        });
+        vscode.window.showErrorMessage('Cannot toggle to corresponding header/source, this filetype is not supported.');
       }
     }).catch((reason) => {
       vscode.window.showErrorMessage(reason);
     });
+
   });
 
   context.subscriptions.push(disposable);
